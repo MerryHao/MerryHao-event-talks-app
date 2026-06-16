@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BigQuery Release Notes Explorer</title>
+    <meta name="description" content="Browse, search, and tweet BigQuery release notes in a modern, dark-mode glassmorphic dashboard.">
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- FontAwesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar Navigation -->
+        <aside class="sidebar glass-card">
+            <div class="brand">
+                <div class="logo-icon">
+                    <i class="fa-solid fa-database logo-pulse"></i>
+                </div>
+                <h2>BQ Explorer</h2>
+            </div>
+            
+            <nav class="sidebar-nav">
+                <a href="#" class="active"><i class="fa-solid fa-list-check"></i> Release Notes</a>
+                <a href="https://cloud.google.com/bigquery/docs/release-notes" target="_blank" rel="noopener noreferrer"><i class="fa-solid fa-arrow-up-right-from-square"></i> Official Docs</a>
+                <a href="https://github.com/googleapis/google-cloud-python/tree/main/packages/google-cloud-bigquery" target="_blank" rel="noopener noreferrer"><i class="fa-brands fa-github"></i> BigQuery SDK</a>
+            </nav>
+            
+            <div class="sidebar-footer">
+                <p>Built with Flask & Vanilla Web Technologies</p>
+                <div class="badge-status">
+                    <span class="pulse-dot"></span> Online
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Workspace -->
+        <main class="main-content">
+            <!-- Header -->
+            <header class="main-header glass-card">
+                <div class="header-title-area">
+                    <h1>BigQuery Release Notes</h1>
+                    <p class="subtitle">Monitor GCP updates and draft tweets instantly</p>
+                </div>
+                
+                <div class="header-actions">
+                    <div class="last-updated-text" id="last-updated-container">
+                        Last checked: <span id="last-updated-time">Never</span>
+                    </div>
+                    <button id="refresh-btn" class="btn btn-primary" title="Refresh feed">
+                        <i class="fa-solid fa-arrows-rotate" id="refresh-icon"></i>
+                        <span>Refresh Notes</span>
+                    </button>
+                </div>
+            </header>
+
+            <!-- Search and Filter Bar -->
+            <section class="filter-section glass-card">
+                <div class="search-box">
+                    <i class="fa-solid fa-magnifying-glass search-icon"></i>
+                    <input type="text" id="search-input" placeholder="Search updates by keywords...">
+                    <button class="clear-search" id="clear-search-btn" style="display: none;">
+                        <i class="fa-solid fa-xmark"></i>
+                    </button>
+                </div>
+                
+                <div class="filter-pills" id="type-filters">
+                    <button class="filter-pill active" data-type="all">All Updates</button>
+                    <button class="filter-pill" data-type="feature"><span class="pill-dot feature"></span> Features</button>
+                    <button class="filter-pill" data-type="issue"><span class="pill-dot issue"></span> Issues</button>
+                    <button class="filter-pill" data-type="changed"><span class="pill-dot changed"></span> Changed</button>
+                    <button class="filter-pill" data-type="deprecated"><span class="pill-dot deprecated"></span> Deprecated</button>
+                    <button class="filter-pill" data-type="other"><span class="pill-dot other"></span> Others</button>
+                </div>
+            </section>
+
+            <!-- Grid Content Layout -->
+            <div class="content-grid">
+                <!-- Feed Column -->
+                <section class="feed-column">
+                    <div id="feed-loading" class="loading-container">
+                        <div class="skeleton-card glass-card"></div>
+                        <div class="skeleton-card glass-card"></div>
+                        <div class="skeleton-card glass-card"></div>
+                    </div>
+                    
+                    <div id="feed-error" class="error-container glass-card" style="display: none;">
+                        <i class="fa-solid fa-circle-exclamation error-icon"></i>
+                        <h3>Failed to fetch release notes</h3>
+                        <p id="error-message">Could not connect to the release feed. Please try again later.</p>
+                        <button class="btn btn-outline" id="retry-btn">Retry Fetch</button>
+                    </div>
+
+                    <div id="feed-empty" class="empty-container glass-card" style="display: none;">
+                        <i class="fa-solid fa-folder-open empty-icon"></i>
+                        <h3>No updates found</h3>
+                        <p>Try resetting filters or changing your search search query.</p>
+                        <button class="btn btn-outline" id="reset-filters-btn">Reset Filters</button>
+                    </div>
+
+                    <!-- Feed Container -->
+                    <div id="feed-container"></div>
+                </section>
+
+                <!-- Tweet Composer Column -->
+                <section class="composer-column">
+                    <div class="sticky-wrapper">
+                        <div class="glass-card composer-card" id="composer-card">
+                            <div class="composer-header">
+                                <div class="composer-header-title">
+                                    <i class="fa-brands fa-x-twitter twitter-accent"></i>
+                                    <h3>Tweet Composer</h3>
+                                </div>
+                                <button class="btn-clear-selection" id="clear-selection-btn" style="display: none;">
+                                    Clear Selection
+                                </button>
+                            </div>
+
+                            <!-- Empty State -->
+                            <div id="composer-empty-state" class="composer-empty">
+                                <i class="fa-solid fa-feather-pointed empty-composer-icon"></i>
+                                <h4>No Update Selected</h4>
+                                <p>Click on any release note card in the feed to automatically generate and edit a tweet about it.</p>
+                            </div>
+
+                            <!-- Active Composer State -->
+                            <div id="composer-active-state" class="composer-active" style="display: none;">
+                                <div class="selected-meta">
+                                    <span class="selected-badge" id="composer-selected-type">Feature</span>
+                                    <span class="selected-date" id="composer-selected-date">June 15, 2026</span>
+                                </div>
+                                
+                                <div class="tweet-preview-container">
+                                    <div class="tweet-avatar">
+                                        <i class="fa-solid fa-user-astronaut"></i>
+                                    </div>
+                                    <div class="tweet-body">
+                                        <div class="tweet-user-info">
+                                            <span class="tweet-name">GCP Enthusiast</span>
+                                            <span class="tweet-handle">@gcp_tracker</span>
+                                        </div>
+                                        <textarea id="tweet-textarea" rows="6" maxlength="280" placeholder="What's happening?"></textarea>
+                                    </div>
+                                </div>
+
+                                <!-- Hashtags Builder -->
+                                <div class="hashtags-section">
+                                    <label>Add Hashtags:</label>
+                                    <div class="hashtags-list" id="hashtags-list">
+                                        <button class="hashtag-pill active" data-tag="#BigQuery">#BigQuery</button>
+                                        <button class="hashtag-pill active" data-tag="#GCP">#GCP</button>
+                                        <button class="hashtag-pill" data-tag="#GoogleCloud">#GoogleCloud</button>
+                                        <button class="hashtag-pill" data-tag="#Serverless">#Serverless</button>
+                                        <button class="hashtag-pill" data-tag="#DataAnalytics">#DataAnalytics</button>
+                                    </div>
+                                </div>
+
+                                <!-- Composer Controls -->
+                                <div class="composer-controls">
+                                    <div class="char-count-ring">
+                                        <svg class="progress-ring" width="36" height="36">
+                                            <circle class="progress-ring-bg" stroke="rgba(255,255,255,0.08)" stroke-width="3" fill="transparent" r="14" cx="18" cy="18" />
+                                            <circle class="progress-ring-circle" id="char-progress" stroke="#00f5d4" stroke-width="3" fill="transparent" r="14" cx="18" cy="18" />
+                                        </svg>
+                                        <span id="char-count-text" class="char-count-text">280</span>
+                                    </div>
+                                    
+                                    <div class="action-buttons">
+                                        <button id="copy-tweet-btn" class="btn btn-outline-icon" title="Copy text to clipboard">
+                                            <i class="fa-regular fa-copy"></i>
+                                        </button>
+                                        <button id="tweet-btn" class="btn btn-twitter">
+                                            <i class="fa-brands fa-x-twitter"></i>
+                                            <span>Post Tweet</span>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+            </div>
+        </main>
+    </div>
+
+    <!-- Custom Script -->
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>
